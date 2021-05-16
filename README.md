@@ -3,9 +3,9 @@
 
 ## About
 
-A script for usage with Ansible Vault and pass (https://www.passwordstore.org)
-or gopass (https://www.gopass.pw) to keep vault passwords in an encrypted
-passwordstore.
+A script that allows to keep Ansible Vault passwords in a gpg encrypted files
+managed by pass (https://www.passwordstore.org) or compatible password managers
+like gopass (https://www.gopass.pw).
 
 
 ## Requirements
@@ -17,7 +17,7 @@ pass or gopass
 
 ## Usage
 
-This script MUST be saved with executable permissions.
+This script **MUST** be saved with executable permissions.
 
 To use gopass instead pass just change a line  
 `pass_command = 'pass'`  
