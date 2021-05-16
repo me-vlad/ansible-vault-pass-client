@@ -1,0 +1,123 @@
+#!/usr/bin/env python3
+# -*- coding: utf8 -*-
+
+"""
+
+A script for usage with Ansible Vault and pass (https://www.passwordstore.org)
+or gopass (https://www.gopass.pw) to keep vault passwords in an encrypted
+passwordstore.
+
+To use gopass instead pass just change a line
+pass_command = 'pass'
+to
+pass_command = 'gopass'
+
+
+This script MUST be saved with executable permissions.
+
+You can set ANSIBLE_VAULT_PASSWORD_FILE=/path/to/ansible-vault-pass-client
+environment variable or use ansible utils with --vault-password-file option.
+
+Also you can add to 'vault_password_file' option to [defaults] section of the
+Ansible config file (ansible.cfg):
+
+[defaults]
+vault_password_file = /path/to/ansible-vault-pass-client
+
+
+To configure default passwordstore for vault password add a new section to your
+ansible configuration file:
+
+[vault]
+passwordstore = ansible/prod
+
+Single script may return different vault passwords. To use this feature, script
+file must have a name that ends with -client suffix.
+Use a CLI option --vault-id to set required passwordstore name.
+
+ansible-playbook \
+        --vault-id ansible/dev@/path/to/ansible-vault-pass-client site.yml
+
+If vault-id is not set by CLI option or vault-id=default, script will search
+for a passwordstore name in the Ansible config file.
+
+"""
+
+from argparse import ArgumentParser as AP
+from configparser import ConfigParser, NoOptionError, NoSectionError
+from os import environ, getcwd, path
+from subprocess import PIPE, Popen
+from sys import exit, stderr, stdout
+
+# Password manager to use (pass or gopass)
+pass_command = 'pass'
+
+# Get Ansible config file
+try:
+    import ansible.constants as C
+    ansible_config_file = C.CONFIG_FILE
+except ImportError:
+    try:
+        ansible_config_file = environ['ANSIBLE_CONFIG']
+    except KeyError:
+        cfg = getcwd() + '/' + 'ansible.cfg'
+        if path.isfile(cfg):
+            ansible_config_file = cfg
+        else:
+            ansible_config_file = path.expanduser('~/.ansible.cfg')
+
+
+def get_vault_id():
+    # Get passwordstore name from '--vault-id' CLI option
+    parser = AP(description='Get a vault password from passwordstore')
+
+    parser.add_argument('--vault-id', action='store', default='default',
+                        dest='vault_id',
+                        help='passwordstore containing the vault password')
+
+    vault_id = parser.parse_args().vault_id.strip()
+
+    return vault_id
+
+
+def get_config_passwordstore():
+    # Get passwordstore name from Ansible config file
+    if ansible_config_file:
+        try:
+            # Raad Ansible config
+            config = ConfigParser()
+            config.read(ansible_config_file)
+            # Get passwordstore name from Ansible config
+            passwordstore = config.get('vault', 'passwordstore',
+                                       fallback='').strip()
+        except NoOptionError:
+            pass
+        except NoSectionError:
+            pass
+    else:
+        pass
+    return passwordstore
+
+
+def main():
+    vault_id = get_vault_id()
+    if (vault_id != 'default' and vault_id != ""):
+        passwordstore = vault_id
+    else:
+        passwordstore = get_config_passwordstore()
+
+    if passwordstore:
+        # Get vault password from passwordstore
+        proc = Popen([pass_command, passwordstore], stdout=PIPE, stderr=PIPE)
+        output = proc.communicate()[0].decode('utf-8').strip().split("\n")[0]
+        stdout.write(output)
+        exit(0)
+    else:
+        stderr.write("Couldn't get passwordstore settings from Ansible config "
+                     "file or --vault-id option!\nPlease read the comments "
+                     "in this script header.\n")
+        exit(1)
+
+
+if __name__ == '__main__':
+    main()
