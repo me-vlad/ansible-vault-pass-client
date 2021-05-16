@@ -4,7 +4,7 @@
 ## About
 
 A script for usage with Ansible Vault and pass (https://www.passwordstore.org)
-or gopass (https://www.gopass.pw) to keep vault passwords in an encrypted 
+or gopass (https://www.gopass.pw) to keep vault passwords in an encrypted
 passwordstore.
 
 
@@ -59,3 +59,12 @@ ansible-playbook \
 If vault-id is not set by CLI option or vault-id=default, script will search
 for a passwordstore name in the Ansible config file.
 
+
+## License
+
+MIT
+
+
+## Author Information
+
+Vlad V. Teteria
