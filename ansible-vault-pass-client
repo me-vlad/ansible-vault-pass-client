@@ -2,45 +2,9 @@
 # -*- coding: utf8 -*-
 
 """
-
 A script that allows to keep Ansible Vault passwords in a gpg encrypted files
 managed by pass (https://www.passwordstore.org) or compatible password managers
 like gopass (https://www.gopass.pw).
-
-To use gopass instead pass just change a line
-pass_command = 'pass'
-to
-pass_command = 'gopass'
-
-
-This script MUST be saved with executable permissions.
-
-You can set ANSIBLE_VAULT_PASSWORD_FILE=/path/to/ansible-vault-pass-client
-environment variable or use ansible utils with --vault-password-file option.
-
-Also you can add to 'vault_password_file' option to [defaults] section of the
-Ansible config file (ansible.cfg):
-
-[defaults]
-vault_password_file = /path/to/ansible-vault-pass-client
-
-
-To configure default passwordstore for vault password add a new section to your
-ansible configuration file:
-
-[vault]
-passwordstore = ansible/prod
-
-Single script may return different vault passwords. To use this feature, script
-file must have a name that ends with -client suffix.
-Use a CLI option --vault-id to set required passwordstore name.
-
-ansible-playbook \
-        --vault-id ansible/dev@/path/to/ansible-vault-pass-client site.yml
-
-If vault-id is not set by CLI option or vault-id=default, script will search
-for a passwordstore name in the Ansible config file.
-
 """
 
 from argparse import ArgumentParser as AP
@@ -69,7 +33,9 @@ except ImportError:
 
 def get_vault_id():
     # Get passwordstore name from '--vault-id' CLI option
-    parser = AP(description='Get a vault password from passwordstore')
+    parser = AP(description='Get a vault password from passwordstore',
+                epilog='Please read the README.md file for more info.',
+                allow_abbrev=False)
 
     parser.add_argument('--vault-id', action='store', default='default',
                         dest='vault_id',
@@ -114,8 +80,8 @@ def main():
         exit(0)
     else:
         stderr.write("Couldn't get passwordstore settings from Ansible config "
-                     "file or --vault-id option!\nPlease read the comments "
-                     "in this script header.\n")
+                     "file or --vault-id option!\nPlease read the README.md "
+                     "file for more info about script settings.\n")
         exit(1)
 
 
