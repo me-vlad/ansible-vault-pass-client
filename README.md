@@ -10,9 +10,9 @@ like gopass (https://www.gopass.pw).
 
 ## Requirements
 
-python3  
-ansible  
-pass or gopass
+- `python3`
+- ansible
+- `pass` or `gopass`
 
 
 ## Usage
@@ -31,7 +31,7 @@ environment variable or use ansible utils with --vault-password-file option.
 Also you can add to 'vault_password_file' option to [defaults] section of the
 Ansible config file (ansible.cfg):
 
-``` ini
+```ini
 [defaults]
 vault_password_file = /path/to/ansible-vault-pass-client
 ```
@@ -40,7 +40,7 @@ vault_password_file = /path/to/ansible-vault-pass-client
 To configure default passwordstore for vault password add a new section to your
 ansible configuration file:
 
-``` ini
+```ini
 [vault]
 passwordstore = ansible/prod
 ```
@@ -51,7 +51,7 @@ Single script may return different vault passwords. To use this feature, script
 file must have a name that ends with -client suffix.
 Use a CLI option --vault-id to set required passwordstore name.
 
-```
+```shell
 ansible-playbook \
         --vault-id ansible/dev@/path/to/ansible-vault-pass-client site.yml
 ```
