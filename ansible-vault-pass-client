@@ -6,39 +6,55 @@ managed by pass (https://www.passwordstore.org) or compatible password managers
 like gopass (https://www.gopass.pw).
 """
 
-from argparse import ArgumentParser as AP
-from configparser import ConfigParser, NoOptionError, NoSectionError
-from os import environ, getcwd, path
-from subprocess import PIPE, Popen
-from sys import exit, stderr, stdout
+import argparse
+import configparser
+import subprocess
+import sys
+import os
 
 # Password manager to use (pass or gopass)
-pass_command = 'pass'
+pass_command = "pass"
 
-# Get Ansible config file
-try:
-    import ansible.constants as C
-    ansible_config_file = C.CONFIG_FILE
-except ImportError:
+
+def get_ansible_config_file():
     try:
-        ansible_config_file = environ['ANSIBLE_CONFIG']
+        import ansible
+
+        return ansible.constants.CONFIG_FILE
+    except ImportError:
+        pass
+
+    try:
+        return os.environ["ANSIBLE_CONFIG"]
     except KeyError:
-        cfg = getcwd() + '/' + 'ansible.cfg'
-        if path.isfile(cfg):
-            ansible_config_file = cfg
-        else:
-            ansible_config_file = path.expanduser('~/.ansible.cfg')
+        pass
+
+    cfg_curr_dir = os.path.join(os.getcwd(), "ansible.cfg")
+    if os.path.isfile(cfg_curr_dir):
+        return cfg_curr_dir
+
+    cfg_home_dir = os.path.expanduser("~/.ansible.cfg")
+    if os.path.isfile(cfg_home_dir):
+        return cfg_home_dir
+
+    return "/etc/ansible/ansible.cfg"
 
 
 def get_vault_id():
     # Get passwordstore name from '--vault-id' CLI option
-    parser = AP(description='Get a vault password from passwordstore',
-                epilog='Please read the README.md file for more info.',
-                allow_abbrev=False)
+    parser = argparse.ArgumentParser(
+        description="Get a vault password from passwordstore",
+        epilog="Please read the README.md file for more info.",
+        allow_abbrev=False,
+    )
 
-    parser.add_argument('--vault-id', action='store', default='default',
-                        dest='vault_id',
-                        help='passwordstore containing the vault password')
+    parser.add_argument(
+        "--vault-id",
+        action="store",
+        default="default",
+        dest="vault_id",
+        help="passwordstore containing the vault password",
+    )
 
     vault_id = parser.parse_args().vault_id.strip()
 
@@ -46,18 +62,19 @@ def get_vault_id():
 
 
 def get_config_passwordstore():
+    ansible_config_file = get_ansible_config_file()
+
     # Get passwordstore name from Ansible config file
     if ansible_config_file:
         try:
             # Read Ansible config
-            config = ConfigParser()
+            config = configparser.ConfigParser()
             config.read(ansible_config_file)
             # Get passwordstore name from Ansible config
-            passwordstore = config.get('vault', 'passwordstore',
-                                       fallback='').strip()
-        except NoOptionError:
+            passwordstore = config.get("vault", "passwordstore", fallback="").strip()
+        except configparser.NoOptionError:
             pass
-        except NoSectionError:
+        except configparser.NoSectionError:
             pass
     else:
         pass
@@ -72,15 +89,19 @@ def main():
         passwordstore = get_config_passwordstore()
 
     if passwordstore:
-        # Get vault password from passwordstore
-        proc = Popen([pass_command, passwordstore], stdout=PIPE, stderr=PIPE)
-        output = proc.communicate()[0].decode('utf-8').strip().split("\n")[0]
-        stdout.write(output)
+        password = (
+            subprocess.check_output([pass_command, passwordstore])
+            .strip()
+            .decode("UTF-8")
+        )
+        print(password, end="")
         exit(0)
     else:
-        stderr.write("Couldn't get passwordstore settings from Ansible config "
-                     "file or --vault-id option!\nPlease read the README.md "
-                     "file for more info about script settings.\n")
+        print(
+            "Couldn't get passwordstore settings from Ansible config file or --vault-id option!\n"
+            "Please read the README.md file for more info about script settings.",
+            file=sys.stderr,
+        )
         exit(1)
 
 
