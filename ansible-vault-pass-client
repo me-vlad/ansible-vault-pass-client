@@ -4,6 +4,11 @@
 A script that allows to keep Ansible Vault passwords in a gpg encrypted files
 managed by pass (https://www.passwordstore.org) or compatible password managers
 like gopass (https://www.gopass.pw).
+
+Password store lookup priority:
+  1. --vault-id CLI option
+  2. ANSIBLE_VAULT_PASSWORDSTORE environment variable
+  3. [vault] passwordstore in ansible.cfg
 """
 
 from argparse import ArgumentParser as AP
@@ -64,12 +69,19 @@ def get_config_passwordstore():
     return passwordstore
 
 
+def get_env_passwordstore():
+    # Get passwordstore name from environment variable
+    return environ.get('ANSIBLE_VAULT_PASSWORDSTORE', '').strip()
+
+
 def main():
     vault_id = get_vault_id()
     if vault_id != "default" and vault_id != "":
         passwordstore = vault_id
     else:
-        passwordstore = get_config_passwordstore()
+        passwordstore = get_env_passwordstore()
+        if not passwordstore:
+            passwordstore = get_config_passwordstore()
 
     if passwordstore:
         # Get vault password from passwordstore
@@ -78,8 +90,9 @@ def main():
         stdout.write(output)
         exit(0)
     else:
-        stderr.write("Couldn't get passwordstore settings from Ansible config "
-                     "file or --vault-id option!\nPlease read the README.md "
+        stderr.write("Couldn't get passwordstore settings from --vault-id option, "
+                     "ANSIBLE_VAULT_PASSWORDSTORE env variable, or Ansible config "
+                     "file!\nPlease read the README.md "
                      "file for more info about script settings.\n")
         exit(1)
 
