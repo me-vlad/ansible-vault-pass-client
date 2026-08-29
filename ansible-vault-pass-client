@@ -11,14 +11,16 @@ Password store lookup priority:
   3. [vault] passwordstore in ansible.cfg
 """
 
+import shlex
+import sys
 from argparse import ArgumentParser as AP
-from configparser import ConfigParser, NoOptionError, NoSectionError
+from configparser import ConfigParser
 from os import environ, getcwd, path
-from subprocess import PIPE, Popen
-from sys import exit, stderr, stdout
+from subprocess import run
 
-# Password manager to use (pass or gopass)
-pass_command = 'pass'
+# Password manager command (pass, gopass, 'gopass show -o', etc.)
+pass_command = shlex.split(
+    environ.get('ANSIBLE_VAULT_PASS_COMMAND', '')) or ['pass']
 
 # Get Ansible config file
 try:
@@ -47,26 +49,17 @@ def get_vault_id():
 
     vault_id = parser.parse_args().vault_id.strip()
 
-    return vault_id
+    # Ansible always invokes client scripts with '--vault-id <label>' and
+    # uses the literal label 'default' when no label was given, so 'default'
+    # means "not specified" and enables the env/config fallback below.
+    return '' if vault_id == 'default' else vault_id
 
 
 def get_config_passwordstore():
     # Get passwordstore name from Ansible config file
-    if ansible_config_file:
-        try:
-            # Read Ansible config
-            config = ConfigParser()
-            config.read(ansible_config_file)
-            # Get passwordstore name from Ansible config
-            passwordstore = config.get('vault', 'passwordstore',
-                                       fallback='').strip()
-        except NoOptionError:
-            pass
-        except NoSectionError:
-            pass
-    else:
-        pass
-    return passwordstore
+    config = ConfigParser()
+    config.read(ansible_config_file)
+    return config.get('vault', 'passwordstore', fallback='').strip()
 
 
 def get_env_passwordstore():
@@ -75,26 +68,35 @@ def get_env_passwordstore():
 
 
 def main():
-    vault_id = get_vault_id()
-    if vault_id != "default" and vault_id != "":
-        passwordstore = vault_id
-    else:
+    passwordstore = get_vault_id()
+    if not passwordstore:
         passwordstore = get_env_passwordstore()
-        if not passwordstore:
-            passwordstore = get_config_passwordstore()
+    if not passwordstore:
+        passwordstore = get_config_passwordstore()
 
-    if passwordstore:
-        # Get vault password from passwordstore
-        proc = Popen([pass_command, passwordstore], stdout=PIPE, stderr=PIPE)
-        output = proc.communicate()[0].decode('utf-8').strip().split("\n")[0]
-        stdout.write(output)
-        exit(0)
-    else:
-        stderr.write("Couldn't get passwordstore settings from --vault-id option, "
-                     "ANSIBLE_VAULT_PASSWORDSTORE env variable, or Ansible config "
-                     "file!\nPlease read the README.md "
-                     "file for more info about script settings.\n")
-        exit(1)
+    if not passwordstore:
+        sys.stderr.write(
+            "Couldn't get passwordstore settings from --vault-id option, "
+            "ANSIBLE_VAULT_PASSWORDSTORE env variable, or Ansible config "
+            "file!\nPlease read the README.md "
+            "file for more info about script settings.\n")
+        sys.exit(1)
+
+    # Get vault password from passwordstore
+    try:
+        proc = run(pass_command + [passwordstore],
+                   capture_output=True, text=True)
+    except FileNotFoundError:
+        sys.stderr.write("Password manager command '%s' not found in PATH!\n"
+                         % pass_command[0])
+        sys.exit(1)
+
+    if proc.returncode != 0:
+        sys.stderr.write(proc.stderr)
+        sys.exit(proc.returncode)
+
+    sys.stdout.write(proc.stdout.split("\n")[0])
+    sys.exit(0)
 
 
 if __name__ == "__main__":
